@@ -1,87 +1,120 @@
 <h1 align="center">NanoRemix</h1>
 
-<p align="center"><strong>RNA modification prediction from Oxford Nanopore direct RNA sequencing</strong></p>
+<p align="center"><strong>Read-level RNA modification calling from Oxford Nanopore direct RNA sequencing</strong></p>
 
 <div align="center">
 
-**RNA002 and RNA004** · **Targeted Binary and family-aware Multi** · **Optional sequence–signal fusion**
+**RNA002 & RNA004** · **Binary & Multi classification** · **Optional signal–sequence fusion**
 
-Source **v0.3.1** · Pretrained models **v0.3.0** · Recommended **Python 3.10 / 3.11**
+[Supported modifications](#1-supported-modifications) · [Commands and inputs](#2-commands-and-inputs) · [Key parameters](#3-key-parameters) · [Preprocessing](#4-recommended-preprocessing) · [Run detection](#5-detect-modifications-with-pretrained-models)
 
-[Model coverage](#1-model-coverage) · [Workflow](#2-from-reads-to-results) · [Quick start](#3-quick-start) · [Run a pretrained model](#4-run-a-pretrained-model)
-
-**[User guide](USER_GUIDE.md)** · **[CLI reference](docs/OPTIONS.md)** · **[Pretrained models](https://github.com/iris982022/nanoremix_tool_ENG/releases/tag/v0.3.0)**
+**[User guide](USER_GUIDE.md)** · **[Full CLI reference](docs/OPTIONS.md)** · **[Pretrained weights](https://github.com/iris982022/nanoremix_tool_ENG/releases/tag/v0.3.0)**
 
 </div>
 
----
+NanoRemix scores each candidate position on each read. One CLI covers both ONT chemistries with matching pretrained weights. You can use Nanopore signal evidence on its own, add aligned sequence evidence, or start from compatible precomputed probabilities. Every run records the selected classes, evidence source and reasons for rejected candidates.
 
-### What NanoRemix offers
+## 1. Supported modifications
 
-| Capability | What it gives you |
-| --- | --- |
-| **One CLI across two chemistries** | Use the same commands with chemistry-specific RNA002 and RNA004 models. Choose a dedicated modified/unmodified pair or compare selected labels within the reference-base family. |
-| **Signal and sequence, with a choice of evidence** | Run the Nanopore signal branch alone, or combine it with an aligned 81 nt sequence model. Supply compatible precomputed probabilities to bypass model inference for either branch. |
-| **Auditable decisions for every candidate** | Inspect labels, conditional probabilities, evidence sources and rejection reasons. Each run records the input checksum, parameters, selected labels and hashes of loaded model files. |
-| **Pretrained, route-specific downloads** | Download the weight ZIP for your chemistry and task. Add the shared sequence model only when you need to compute sequence probabilities. |
+**Binary** supports three dedicated comparisons for both chemistries: A vs m6A, C vs m5C and U vs pseudouridine (`pseudoU`). Request one or more pairs in the same run. Each candidate is evaluated in the family of its reference base.
 
-## 1. Model coverage
+**Multi** compares selected classes within each reference-base family. The signal models support the following modifications, plus the unmodified classes A, C, G and U.
 
-| Nanopore chemistry | Binary targets | Multi coverage | Required signal-model input per candidate |
-| --- | --- | --- | --- |
-| **RNA002** | m6A, m5C, pseudouridine (`pseudoU`) | 14 modifications + A/C/G/U | 9 nt context + 20 signal descriptors |
-| **RNA004** | m6A, m5C, pseudouridine (`pseudoU`) | 12 modifications + A/C/G/U | 17 nt context + 36 signal descriptors |
+| Reference base | RNA002 Multi · 14 modifications | RNA004 Multi · 12 modifications |
+| :--- | :--- | :--- |
+| A | m6A, m1A, Inosine, Am | m6A, m1A, Am |
+| C | m5C, hm5C, ac4C, FormylC | m5C, hm5C, ac4C |
+| G | m7G, o8G | o8G, Gm |
+| U | pseudoU, m1psi, m5U, Um | pseudoU, m1psi, m5U, Um |
 
-Binary compares each target with its unmodified counterpart. Multi compares selected classes within each reference-base family. Choose S1 or S2, or save both strategies separately. Extended fusion preserves third-generation-only classes and records their evidence source. [Exact supported labels and evidence coverage](USER_GUIDE.md#model-coverage)
+The shared **second-generation sequence model** covers 11 modifications: m6A, m1A, Inosine, Am, m5C, ac4C, m7G, Gm, pseudoU, m5U and Um, plus A/C/G/U. With default extended fusion, classes supported only by the selected signal model retain their signal evidence. [Class selection and fusion coverage](USER_GUIDE.md#model-coverage)
 
-## 2. From reads to results
+## 2. Commands and inputs
+
+| What you want to do | Command | Required input and result |
+| :--- | :--- | :--- |
+| Find supported labels | `nanoremix catalog --chemistry RNA004` | Optional chemistry. Returns the Binary, Multi, and evidence-specific class lists. |
+| Convert extracted signal features | `nanoremix prepare` | RNA002 Step4 TSV / extracted table, or RNA004 positive-strand Step6 table. Writes a prepared feature table. |
+| Check model files and dependencies | `nanoremix doctor` | Model directory and requested route. Reports file, metadata, hash and dependency checks. |
+| Test the input and run inference | `nanoremix validate` | The same input and model arguments as `predict`. Returns a validation summary. |
+| Classify candidate modifications | `nanoremix predict` | Prepared features or compatible probabilities, plus any model assets required by the chosen route. Writes per-read calls, an audit table and a run manifest. |
+
+The prediction input is a UTF-8 CSV or TSV with a header. Gzip is supported. Each row is one read–candidate observation.
+
+- **Third-generation feature input** uses `9mer_final` with 9 nt for RNA002 or 17 nt for RNA004. It has four groups of signal columns (`mean_output1…K`, `median_output1…K`, `std_output1…K` and `length_output1…K`), with K=5 for RNA002 and K=9 for RNA004.
+- **Precomputed third-generation probabilities** use `--input-kind probabilities` and include a reference center. Binary requires a column such as `s2_prob_m6A` for each requested pair and strategy. Multi requires the full native probability axis for each strategy (18 classes for RNA002 and 16 for RNA004).
+- **Second-generation evidence** uses a same-center, same-direction 81 nt sequence and the shared sequence model, or a complete 15-class probability vector per candidate. A separate probability table joins by an explicit key such as `record_key`. [Input columns and examples](docs/INPUTS.md)
+
+## 3. Key parameters
+
+| Parameter | How to choose |
+| :--- | :--- |
+| `--chemistry RNA002` or `RNA004` | Match the ONT kit and model ZIP to the sample. |
+| `--task binary` or `multi` | Use `binary` for dedicated modified/unmodified pairs, or `multi` for several competing classes in a reference-base family. |
+| `--mods m6A,m5C` or `all` | Select target modifications. NanoRemix adds matching unmodified controls by default. With Multi, use `--targets A,m6A,m1A` to specify the exact class set. |
+| `--strategy s1`, `s2` or `both` | S1 combines position-specific signal models. S2 uses joint, multi-position signal models and is the default. `both` saves separate S1 and S2 results. |
+| `--mode thirdgen` | Use Nanopore signal features or compatible precomputed signal probabilities. |
+| `--mode secondgen` | Use the sequence branch alone. Provide candidate reference-base identity plus sequences or complete second-generation probabilities. |
+| `--data-type biological` | Fuse signal and sequence evidence. Add `--also-thirdgen --also-secondgen` to save the component outputs as well. Choose either `--data-type` or `--mode`. |
+| `--sequence-column sequence81` | Identify the 81 nt sequence column. For a separate precomputed second-generation table, use `--second-probabilities second.tsv --join-on record_key`. |
+| `--min-confidence` and `--output-filter` | Set the minimum winning conditional probability and choose `all`, `retained` or `modified`. The audit table covers every input candidate. |
+
+“Second generation” and “third generation” refer to NanoRemix model branches. The additional sequence evidence can come from the same candidate's reference context, so fusion needs no separate Illumina data. [All options and defaults](docs/OPTIONS.md)
+
+## 4. Recommended preprocessing
 
 ```mermaid
 flowchart LR
-    r2["RNA002 / FAST5"] --> u2["Guppy / Tombo"] --> s2["Step4 TSV"]
-    r4["RNA004 / POD5"] --> u4["Dorado / Remora"] --> s4["Positive-strand Step6 CSV"]
-    s2 -->|prepare| prepared["Prepared feature table"]
-    s4 -->|prepare| prepared
-    prepared --> infer["NanoRemix predict"]
-    seq["Optional: 81 nt sequence<br/>or 15-class probabilities"] -.-> infer
-    infer --> out["Predictions + audit<br/>+ run manifest"]
-    classDef raw fill:#075985,stroke:#38bdf8,color:#fff
+    raw2["RNA002 FAST5"] --> signal2["Guppy → Tombo / GraphMap"] --> step4["Step4 TSV + coordinates"]
+    raw4["RNA004 POD5"] --> signal4["Dorado → aligned BAM → Remora"] --> step6["Step6 CSV"]
+    step4 -->|prepare| features["Prepared features"]
+    step6 -->|"prepare: positive strand"| features
+    features --> predict["NanoRemix predict"]
+    sequence["81 nt sequence evidence<br/>for fusion"] -.-> predict
+    classDef source fill:#075985,stroke:#38bdf8,color:#fff
     classDef result fill:#0f766e,stroke:#2dd4bf,color:#fff
-    class r2,r4 raw
-    class infer,out result
+    class raw2,raw4 source
+    class features,predict result
 ```
 
-For RNA002, preserve basecalled FAST5 with Guppy `--fast5_out` and keep the Step4 coordinate sidecar. For RNA004, preserve the move table with Dorado `--emit-moves` before extracting signal features. Start at `predict` if you already have a compatible prepared feature or probability table. [Preprocessing steps and input contracts](USER_GUIDE.md#preprocess-raw-reads)
+- **RNA002** — Basecall with Guppy using `--fast5_out`, split to single-read FAST5, resquiggle with Tombo/GraphMap, and retain the Step4 features and coordinate sidecar. Run `nanoremix prepare --input step4.tsv --chemistry RNA002 --format step4 --output prepared002.csv`.
+- **RNA004** — Basecall with Dorado using `--emit-moves`, align and sort the BAM, then use Remora to extract features and merge them into Step6. Run `nanoremix prepare --input step6_positive.csv --chemistry RNA004 --format step6 --output prepared004.csv` for explicit positive-strand input. For negative-strand candidates, supply a correctly oriented prepared table from a validated adapter.
 
-> [!IMPORTANT]
-> The legacy RNA004 Step6 converter accepts explicit positive-strand input. Negative-strand candidates can be scored from a correctly oriented prepared table. The guide describes the required context, coordinate and signal-slot checks. [RNA004 conversion limits](USER_GUIDE.md#rna004-pod5-to-step6)
+If you already have a prepared table, start with `predict`. For sequence-based fusion, use the same candidate center and reference orientation. Use transcript or verified splice-aware coordinates when the 81 nt window crosses a junction. [Full preprocessing commands](docs/guide_20261104/PREPROCESSING.md)
 
-## 3. Quick start
+## 5. Detect modifications with pretrained models
 
-Get the source and create an environment with Python 3.10 or 3.11. This two-row example uses artificial probabilities and requires no model downloads.
+### Install and download
+
+Use Python 3.10 or 3.11. The example below downloads the RNA004 Binary ZIP and runs the released m6A classifier on bundled artificial features. Run the commands in a fresh directory.
 
 ```bash
 git clone https://github.com/iris982022/nanoremix_tool_ENG.git
 cd nanoremix_tool_ENG
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .
+python -m pip install -e '.[models]' -c constraints-models.txt
 
-nanoremix predict \
-  --input examples/minimal_binary_probabilities.csv \
-  --chemistry RNA004 --task binary --mods m6A \
-  --input-kind probabilities --mode thirdgen \
-  --output results/quickstart
+asset=NanoRemix_v0.3.0_models_RNA004_Binary_20261104.zip
+curl -fL "https://github.com/iris982022/nanoremix_tool_ENG/releases/download/v0.3.0/$asset" -o "$asset"
+unzip "$asset"
 ```
 
-Open `results/quickstart/thirdgen/s2/predictions.tsv` to see `m6A` and `A`. Use a new output directory for each run.
+The Release contains the following verified model packages. Extract the ZIPs you need in the repository root to populate `models/`.
 
-## 4. Run a pretrained model
+| Model | Included files |
+| :--- | :--- |
+| RNA002 Binary / Multi | 18 / 6 `.pkl` files, respectively. Multi includes its strategy manifests. |
+| RNA004 Binary / Multi | 30 / 10 `.pkl` files, respectively. Multi includes its strategy manifests. |
+| Shared SecondGen | 25 `.pt` checkpoints and the network definition, shared by RNA002 and RNA004. |
 
-Download the RNA004 Binary ZIP and extract it at the repository root to create `models/`. The command below uses the released model on bundled example features. For your own data, replace `--input` with a prepared feature table in the same format. [Download RNA004 Binary weights](https://github.com/iris982022/nanoremix_tool_ENG/releases/download/v0.3.0/NanoRemix_v0.3.0_models_RNA004_Binary_20261104.zip)
+[Download the five model ZIPs and SHA256 list](https://github.com/iris982022/nanoremix_tool_ENG/releases/tag/v0.3.0) · [Model layout and dependencies](docs/MODELS.md)
+
+### Run an m6A call
 
 ```bash
-python -m pip install -e '.[models]' -c constraints-models.txt
+nanoremix doctor --chemistry RNA004 --task binary --mods m6A --strategy s2 \
+  --data-type synthetic --model-root models --model-checksums models/SHA256.json --strict
 
 nanoremix predict \
   --input docs/guide_20261104/examples/RNA004_prepared_with81.csv \
@@ -91,11 +124,38 @@ nanoremix predict \
   --output results/rna004_m6a
 ```
 
-| To choose | Use |
-| --- | --- |
-| Chemistry, task and target | `--chemistry RNA002` or `RNA004`, `--task binary` or `multi`, and `--mods` with a list or `all` |
-| Evidence and strategy | `--mode thirdgen` for signal-only inference, or `--data-type biological` for fusion. `--strategy s2` is the default, and `both` writes separate S1 and S2 outputs. |
-| Fusion source | `--sequence-column sequence81` for an 81 nt sequence column, or `--second-probabilities second.tsv --join-on record_key` for a separate probability table |
-| Saved predictions | `--output-filter retained` for accepted calls, or `modified` for accepted modified calls. The audit file includes all candidates. |
+For your own data, change `--input` to `prepared004.csv` and use a new output directory. In `doctor`, `--data-type synthetic` scopes the preflight to signal-model assets. The prediction uses `--mode thirdgen` and can score prepared biological data.
 
-[All four workflows](USER_GUIDE.md#run-predictions) · [Output interpretation](USER_GUIDE.md#interpret-the-output) · [All options and defaults](docs/OPTIONS.md) · [License status](LICENSE)
+### Run Multi or add sequence evidence
+
+For RNA004 Multi, extract the **RNA004 Multi** ZIP and select `--task multi --mods all`, or specify a subset such as `--mods m6A,m1A,m5C,pseudoU`. For sequence-based fusion, also extract **SecondGen**, install the sequence dependencies, and supply an aligned `sequence81` column.
+
+```bash
+python -m pip install -e '.[models,second]' -c constraints-models.txt
+
+nanoremix predict --input prepared004_with81.csv --output results/rna004_fusion \
+  --chemistry RNA004 --task multi --mods m6A,m1A,m5C,pseudoU --strategy s2 \
+  --data-type biological --sequence-column sequence81 \
+  --also-thirdgen --also-secondgen \
+  --model-root models --model-checksums models/SHA256.json --trust-model-files
+```
+
+### Read the calls
+
+For the m6A example, open `results/rna004_m6a/thirdgen/s2/predictions.tsv`. Read `predicted_label` and `prob_m6A` together with `status`. A row with `status=ok` and `predicted_label=m6A` is an accepted read-level m6A call. Add `--output-filter modified` to save only accepted modified calls. `selection_audit.tsv` in the same directory includes rejected and out-of-scope candidates. `run_manifest.json` in the output root records the run settings and hashes. Fusion results appear under `fused/s2/` and include `evidence_source`. [Interpretation and site-level aggregation](USER_GUIDE.md#interpret-the-output)
+
+<details>
+<summary>Check the CLI without downloading models</summary>
+
+After cloning and activating the environment, run:
+
+```bash
+python -m pip install -e .
+nanoremix predict --input examples/minimal_binary_probabilities.csv \
+  --chemistry RNA004 --task binary --mods m6A --input-kind probabilities \
+  --mode thirdgen --strategy s2 --output results/quickstart
+```
+
+The two artificial rows return `m6A` and `A`.
+
+</details>
