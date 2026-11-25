@@ -18,7 +18,7 @@
     {
       "path": "DISTRIBUTION.json",
       "bytes": 1140,
-      "sha256": "77464c25a9a1ddc79ed3997f71d8759cd323115cab9e9dab74f1650724a8efb9"
+      "sha256": "20d12962b1601baa726ec8b623edfc7de48fe1340c8cd13b9a3bf4a153aff2ce"
     },
     {
       "path": "LICENSE",
@@ -32,8 +32,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 11283,
-      "sha256": "ea1adc5431aee0ce8c718fa2cefff36cb70a55a1553875e847a26ccafeb33391"
+      "bytes": 12464,
+      "sha256": "fd174255c012ab1d325ae11bc6c0abaa61464fb8116b5744c687f35c46328a83"
     },
     {
       "path": "SECURITY.md",
@@ -62,13 +62,23 @@
     },
     {
       "path": "docs/MODELS.md",
-      "bytes": 8247,
-      "sha256": "935fbb9442c46d2740cf5bf4d45262e2504b8695eac374e49d8754e2f7932cae"
+      "bytes": 10224,
+      "sha256": "ef9b129d2837d0f1a5c87ec4d816dc5f2ee130409e3ba216b2043c8838fe5cb7"
     },
     {
       "path": "docs/OPTIONS.md",
       "bytes": 10030,
       "sha256": "717c3a78ee454601c05b8de4ae9ca9331b97c6c0eb21b35303980cf1d9eecb8c"
+    },
+    {
+      "path": "docs/figures/SF7.png",
+      "bytes": 166908,
+      "sha256": "e7afdebc3b714445ecc5085aa3a23f852cec3ab25b36ab0f047a14e0c80de94e"
+    },
+    {
+      "path": "docs/figures/SF7B.tsv",
+      "bytes": 2163,
+      "sha256": "770329611539c2bcfa18616bf18db042ccecc3c33e62f3dd47f1e6eedc62b1c8"
     },
     {
       "path": "docs/guide_20261104/CLI_help.txt",

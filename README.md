@@ -53,6 +53,7 @@ The prediction input is a UTF-8 CSV or TSV with a header. Gzip is supported. Eac
 | `--task binary` or `multi` | Use `binary` for dedicated modified/unmodified pairs, or `multi` for several competing classes in a reference-base family. |
 | `--mods m6A,m5C` or `all` | Select target modifications. NanoRemix adds matching unmodified controls by default. With Multi, use `--targets A,m6A,m1A` to specify the exact class set. |
 | `--strategy s1`, `s2` or `both` | S1 combines position-specific signal models. S2 uses joint, multi-position signal models and is the default. `both` saves separate S1 and S2 results. |
+| `--condition full` | Use the released signal weights. Each signal block supplies the mean, median, standard deviation and signal length. |
 | `--mode thirdgen` | Use Nanopore signal features or compatible precomputed signal probabilities. |
 | `--mode secondgen` | Use the sequence branch alone. Provide candidate reference-base identity plus sequences or complete second-generation probabilities. |
 | `--data-type biological` | Fuse signal and sequence evidence. Add `--also-thirdgen --also-secondgen` to save the component outputs as well. Choose either `--data-type` or `--mode`. |
@@ -60,6 +61,17 @@ The prediction input is a UTF-8 CSV or TSV with a header. Gzip is supported. Eac
 | `--min-confidence` and `--output-filter` | Set the minimum winning conditional probability and choose `all`, `retained` or `modified`. The audit table covers every input candidate. |
 
 “Second generation” and “third generation” refer to NanoRemix model branches. The additional sequence evidence can come from the same candidate's reference context, so fusion needs no separate Illumina data. [All options and defaults](docs/OPTIONS.md)
+
+**Which Binary strategy should I run?** Choose `--strategy s1` to combine predictions from the shifted windows. Choose `--strategy s2` to score all windows together with one classifier per modification. This is the model stored under `strategy3/m_all_calibrated.pkl` in the release ZIPs. It uses 52 encoded features for RNA002 and 100 for RNA004. [Feature breakdown and SF7 benchmark](docs/MODELS.md#binary-strategies-and-sf7)
+
+<details>
+<summary>View SF7 for m6A, m5C and pseudouridine</summary>
+
+![SF7. Panel A shows individual S1 window scores. Panel B compares the released Binary S2 with Linear, SVM and MLP on three modification tasks for RNA002 and RNA004.](docs/figures/SF7.png)
+
+Panel A shows Zero-scenario research models. Panel B shows the released S2 weights in the Total scenario. RNA002 uses different test splits for S2 and the baselines. [Download SF7 (PDF)](https://github.com/iris982022/nanoremix_tool_ENG/raw/refs/heads/main/docs/figures/SF7.pdf) · [Panel B scores and sample counts](docs/figures/SF7B.tsv)
+
+</details>
 
 ## 4. Recommended preprocessing
 

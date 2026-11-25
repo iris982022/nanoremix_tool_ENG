@@ -35,6 +35,28 @@ Existing third-generation probability input bypasses third-generation models.
 Existing second-generation probability input bypasses the second-generation
 network. This does not turn precomputed probabilities into pretrained weights.
 
+## Binary strategies and SF7
+
+Each candidate has a center reference base. NanoRemix uses that base to route the read to the appropriate Binary classifier. Each flanking base contributes four one-hot columns (A, C, G, U). With `--condition full`, each signal block contributes four values (mean, median, standard deviation and signal length).
+
+| Chemistry | Model evaluated | Signal values | Flanking bases | Encoded features per classifier |
+| --- | --- | ---: | ---: | ---: |
+| RNA002 | S1, each of M1–M5 | 4 | 4 | 20 |
+| RNA004 | S1, each of M1–M9 | 4 | 8 | 36 |
+| RNA002 | S2, one joint classifier per modification | 20 | 8 | 52 |
+| RNA004 | S2, one joint classifier per modification | 36 | 16 | 100 |
+
+**Panel A** reports the individual S1 models trained in the Zero scenario. The release ships Total-scenario S1 weights, and `predict --strategy s1` combines the positional predictions into a single score per candidate and modification.
+
+**Panel B** reports ROC-AUC from archived Total-scenario predictions for the released S2 classifiers. The six weight files match the corresponding release ZIP members by SHA256. In the Binary model directories, `strategy3/m_all_calibrated.pkl` is the historical filename for the public `--strategy s2` route. The earlier central-model comparison used different weights.
+
+| Released S2 ROC-AUC | A vs m6A | C vs m5C | U vs pseudoU |
+| --- | ---: | ---: | ---: |
+| RNA002 | 0.9083 | 0.9431 | 0.9460 |
+| RNA004 | 0.8509 | 0.9256 | 0.9618 |
+
+Linear, SVM and MLP use all signal blocks with the central window's flanking bases (36 features for RNA002 and 68 for RNA004). S2 includes more flanking sequence. For RNA002, S2 used a row-stratified test split and the baselines used ID-grouped splits. These results describe the evaluated configurations. [Figure PDF](https://github.com/iris982022/nanoremix_tool_ENG/raw/refs/heads/main/docs/figures/SF7.pdf) · [All 24 ROC-AUC values, sample counts and S2 weight hashes](figures/SF7B.tsv)
+
 ## Weights Are Not Sufficient Alone
 
 Distribute the trained objects **with their original inference metadata**:
