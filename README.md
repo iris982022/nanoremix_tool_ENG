@@ -4,17 +4,19 @@
 
 <div align="center">
 
-**RNA002 & RNA004** · **Binary & Multi classification** · **Optional signal–sequence fusion**
+**🧬 RNA002 & RNA004** · **🔬 Binary & Multi classification** · **🔗 Optional signal–sequence fusion**
 
 [1. Coverage](#1-supported-modifications-and-commands) · [2. Evidence](#2-second-generation-and-third-generation-evidence) · [3. Strategies](#3-signal-strategies) · [4. Installation](#4-install-the-tool-and-select-weights) · [5. Input](#5-preprocess-reads-and-prepare-input)
 
-**Applications** · [6. Run a prediction](#6-run-a-prediction) · [7. Binary classification](#7-binary-classification) · [8. Multi classification](#8-multi-classification) · [9. Sequence and fusion](#9-sequence-only-and-fused-predictions) · [10. Read results](#10-read-the-results)
+**▶ Applications** · [6. Run a prediction](#6-run-a-prediction) · [7. Binary classification](#7-binary-classification) · [8. Multi classification](#8-multi-classification) · [9. Sequence and fusion](#9-sequence-only-and-fused-predictions) · [10. Read results](#10-read-the-results)
 
-**[User guide](USER_GUIDE.md)** · **[Full CLI reference](docs/OPTIONS.md)** · **[Pretrained weights](https://github.com/iris982022/nanoremix_tool_ENG/releases/tag/v0.3.0)**
+**[📖 User guide](USER_GUIDE.md)** · **[🖥️ Full CLI reference](docs/OPTIONS.md)** · **[📦 Pretrained weights](https://github.com/iris982022/nanoremix_tool_ENG/releases/tag/v0.3.0)**
 
 </div>
 
 NanoRemix scores each candidate position on each read. One CLI covers both ONT chemistries with matching pretrained weights. You can use Nanopore signal evidence on its own, add aligned sequence evidence, or start from compatible precomputed probabilities. Every run records the selected classes, evidence source and reasons for rejected candidates.
+
+![Prediction workflow from signal, sequence or precomputed class probabilities through Binary or Multi inference to read-level calls, scores and an audit table.](docs/figures/prediction-workflow.png)
 
 ## 1. Supported modifications and commands
 
@@ -37,11 +39,11 @@ The shared **second-generation sequence model** covers 11 modifications: m6A, m1
 
 | What you want to do | Command | Required input and result |
 | :--- | :--- | :--- |
-| Find supported labels | `nanoremix catalog --chemistry RNA004` | Optional chemistry. Returns the Binary, Multi, and evidence-specific class lists. |
-| Convert extracted signal features | `nanoremix prepare` | RNA002 Step4 TSV / extracted table, or RNA004 positive-strand Step6 table. Writes a prepared feature table. |
-| Check model files and dependencies | `nanoremix doctor` | Model directory and requested route. Reports file, metadata, hash and dependency checks. |
-| Test the input and run inference | `nanoremix validate` | The same input and model arguments as `predict`. Returns a validation summary. |
-| Classify candidate modifications | `nanoremix predict` | Prepared features or compatible probabilities, plus any model assets required by the chosen route. Writes per-read calls, an audit table and a run manifest. |
+| 🔎 Find supported labels | `nanoremix catalog --chemistry RNA004` | Optional chemistry. Returns the Binary, Multi, and evidence-specific class lists. |
+| 🧰 Convert extracted signal features | `nanoremix prepare` | RNA002 Step4 TSV / extracted table, or RNA004 positive-strand Step6 table. Writes a prepared feature table. |
+| 🩺 Check model files and dependencies | `nanoremix doctor` | Model directory and requested route. Reports file, metadata, hash and dependency checks. |
+| ✅ Test the input and run inference | `nanoremix validate` | The same input and model arguments as `predict`. Returns a validation summary. |
+| ▶️ Classify candidate modifications | `nanoremix predict` | Prepared features or compatible probabilities, plus any model assets required by the chosen route. Writes per-read calls, an audit table and a run manifest. |
 
 ## 2. Second-generation and third-generation evidence
 
@@ -57,6 +59,19 @@ Choose one route option per command. A biological sample can also be scored usin
 
 ## 3. Signal strategies
 
+```mermaid
+flowchart LR
+    blocks["Signal windows<br/>5 for RNA002 · 9 for RNA004"]
+    blocks --> s1["S1 · Score each window"] --> combine["Combine window scores"] --> p1(["S1 prediction"])
+    blocks --> s2["S2 · Score all windows jointly"] --> p2(["S2 prediction"])
+    classDef input fill:#EBF1F5,stroke:#718CA0,color:#20343C
+    classDef shifted fill:#ECF3F2,stroke:#658C82,color:#20343C
+    classDef joint fill:#F7EEF0,stroke:#AE5460,color:#572E35
+    class blocks input
+    class s1,combine,p1 shifted
+    class s2,p2 joint
+```
+
 | Option | What the signal model does | Output |
 | --- | --- | --- |
 | `--strategy s1` | Evaluates shifted windows separately (five for RNA002, nine for RNA004) and combines their predictions. | One S1 result per candidate |
@@ -66,7 +81,7 @@ Choose one route option per command. A biological sample can also be scored usin
 The released weights use **`--condition full`**. Each signal block contributes its mean, median, standard deviation and length. For Binary, an individual S1 classifier takes **20 features for RNA002 or 36 for RNA004**. S2 takes **52 or 100**, respectively, including the encoded flanking bases. The historical Binary weight path `strategy3/m_all_calibrated.pkl` corresponds to the public S2 option. Sequence-only predictions use the shared sequence ensemble and have no signal strategy. [Feature definitions and weight layout](docs/MODELS.md#binary-strategies-and-sf7)
 
 <details>
-<summary>View SF7 for m6A, m5C and pseudouridine</summary>
+<summary>📊 View SF7 for m6A, m5C and pseudouridine</summary>
 
 ![SF7. Panel A shows individual S1 window scores. Panel B compares the released Binary S2 with Linear, SVM and MLP on three modification tasks for RNA002 and RNA004.](docs/figures/SF7.png)
 
@@ -157,6 +172,8 @@ cat results/quickstart/thirdgen/s2/predictions.tsv
 The two input `s2_prob_m6A` values are 0.90 and 0.20. The corresponding `predicted_label` values are `m6A` and `A`. For your own reads, start from a prepared table (section 5) and use the Binary or Multi feature-based command below. To check an input before saving results, run `nanoremix validate` with the same model and input arguments and omit `--output`.
 
 ## 7. Binary classification
+
+![For an A-centered candidate, Binary selects between A and m6A. With the illustrated Multi target set, the eligible classes are A, m6A and m1A.](docs/figures/binary-multi.png)
 
 **Is this A-centered observation A or m6A?** Select `--task binary --mods m6A` and the Binary ZIP matching the chemistry. The example checks the released RNA004 model and scores bundled artificial signal features.
 
